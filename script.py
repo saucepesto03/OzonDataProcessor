@@ -193,7 +193,7 @@ def update_unit_file():
         print(f"   Всего найдено {len(analytics_data)} уникальных SKU в таблице B")
         
         # ============================================
-        # 3. Чтение таблицы C (ozon_dimensions)
+        # 3. Чтение таблицы C (ozon_dimensions) - ОБНОВЛЁННЫЙ БЛОК
         # ============================================
         print("3. Чтение таблицы C (ozon_dimensions)...")
         df_dimensions = read_excel_with_error_handling(dimensions_file, header=None)
@@ -209,12 +209,18 @@ def update_unit_file():
                     length = row[5] if len(row) > 5 else None  # Столбец F (Длина)
                     width = row[3] if len(row) > 3 else None   # Столбец D (Ширина)
                     height = row[4] if len(row) > 4 else None  # Столбец E (Высота)
+                    # НОВОЕ: добавлены столбцы G и H
+                    col_g = row[6] if len(row) > 6 else None   # Столбец G
+                    col_h = row[7] if len(row) > 7 else None   # Столбец H
                     dimensions_data[sku] = {
                         'length': length,
                         'width': width,
-                        'height': height
+                        'height': height,
+                        'col_g': col_g,  # НОВОЕ
+                        'col_h': col_h   # НОВОЕ
                     }
         print(f"   Найдено {len(dimensions_data)} SKU в таблице C")
+        print(f"   Дополнительно извлечены столбцы G и H")
         
         # ============================================
         # 4. Чтение таблицы D (prices_with_co-investment)
@@ -289,6 +295,24 @@ def update_unit_file():
                     if dim.get('height') is not None:
                         ws.cell(row=row, column=7, value=dim['height'])
                         updated = True
+                    
+                    # НОВОЕ: обновление столбца P в зависимости от значения в столбце T
+                    # Читаем значение из столбца T (20-й столбец)
+                    col_t_value = ws.cell(row=row, column=20).value
+                    if col_t_value:
+                        col_t_str = str(col_t_value).strip().upper()
+                        
+                        # Если в столбце T "FBO", заполняем столбец P данными из столбца G таблицы C
+                        if col_t_str == "FBO" and dim.get('col_g') is not None:
+                            ws.cell(row=row, column=16, value=dim['col_g'])  # Столбец P
+                            updated = True
+                            # print(f"   Строка {row}: Заполнен столбец P (FBO) значением {dim['col_g']}")
+                        
+                        # Если в столбце T "FBS", заполняем столбец P данными из столбца H таблицы C
+                        elif col_t_str == "FBS" and dim.get('col_h') is not None:
+                            ws.cell(row=row, column=16, value=dim['col_h'])  # Столбец P
+                            updated = True
+                            # print(f"   Строка {row}: Заполнен столбец P (FBS) значением {dim['col_h']}")
 
                 # Обновляем из таблицы B
                 if sku_str in analytics_data:
@@ -323,7 +347,7 @@ def update_unit_file():
         print("=" * 60)
         print(f"Таблица A (MARK): {len(mark_data)} SKU")
         print(f"Таблица B (analytics): {len(analytics_data)} уникальных SKU из {len(analytics_files)} файлов")
-        print(f"Таблица C (dimensions): {len(dimensions_data)} SKU")
+        print(f"Таблица C (dimensions): {len(dimensions_data)} SKU (с извлечением столбцов G и H)")
         print(f"Таблица D (prices): {len(prices_data)} SKU")
         print(f"Таблица F (unit): {total_rows} строк с SKU, {updated_count} обновлено")
         print(f"\nФайлы:")
@@ -345,6 +369,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Создаётся обновлённая копия файла, оригинал остаётся без изменений.")
     print("Внимание: Обрабатываются 2 последних файла в папке analytics_report")
+    print("Новое: Из таблицы C извлекаются столбцы G и H для заполнения столбца P")
+    print("Новое: Столбец P заполняется в зависимости от значения в столбце T (FBO/FBS)")
     print("=" * 60)
     
     success = update_unit_file()

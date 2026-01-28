@@ -66,8 +66,45 @@ def get_all_product_ids(headers):
 
     return product_ids
 
+def get_products_prices(product_ids, headers):
+    """Получает sales_percent_fbo и sales_percent_fbs для списка товаров"""
+    prices_data = {}
+    
+    for i in range(0, len(product_ids), 100):
+        chunk = product_ids[i:i + 100]
+        payload = {
+            "filter": {"product_id": chunk},
+            "limit": 100
+        }
+        r = requests.post(
+            f"{BASE_URL}/v5/product/info/prices",
+            json=payload,
+            headers=headers
+        )
+        
+        if r.status_code == 200:
+            data = r.json()
+            items = data.get("items", [])
+            
+            for item in items:
+                product_id = item.get("product_id")
+                commissions = item.get("commissions", {})
+                prices_data[product_id] = {
+                    "sales_percent_fbo": commissions.get("sales_percent_fbo"),
+                    "sales_percent_fbs": commissions.get("sales_percent_fbs")
+                }
+        else:
+            print(f"  Ошибка при получении цен: {r.status_code}")
+            print(f"  Ответ: {r.text}")
+    
+    return prices_data
+
 def get_products_attributes(product_ids, headers):
     rows = []
+    
+    # Получаем данные о ценах (sales_percent) для всех товаров
+    print(f"  Получение данных о комиссиях...")
+    prices_data = get_products_prices(product_ids, headers)
 
     for i in range(0, len(product_ids), 100):
         chunk = product_ids[i:i + 100]
@@ -83,13 +120,18 @@ def get_products_attributes(product_ids, headers):
         products = r.json()["result"]
 
         for p in products:
+            product_id = p.get("id")
+            price_info = prices_data.get(product_id, {})
+            
             rows.append({
                 "sku": p.get("sku"),
                 "name": p.get("name"),
                 "offer_id": p.get("offer_id"),
                 "width_cm": mm_to_cm(p.get("width")),
                 "height_cm": mm_to_cm(p.get("height")),
-                "length_cm": mm_to_cm(p.get("depth"))
+                "length_cm": mm_to_cm(p.get("depth")),
+                "sales_percent_fbo": price_info.get("sales_percent_fbo"),
+                "sales_percent_fbs": price_info.get("sales_percent_fbs")
             })
 
     return rows
@@ -129,9 +171,16 @@ def main():
         all_rows.extend(rows)
 
     df = pd.DataFrame(all_rows)
+    
+    # Упорядочиваем колонки
+    column_order = ["sku", "offer_id", "name", "width_cm", "height_cm", "length_cm", 
+                   "sales_percent_fbo", "sales_percent_fbs"]
+    df = df[column_order]
+    
     df.to_excel(OUTPUT_PATH, index=False)
     print(f"\n✅ Отчёт сохранен: {OUTPUT_PATH}")
     print(f"✅ Обработано товаров: {len(df)}")
+    print(f"✅ Добавлены колонки: sales_percent_fbo, sales_percent_fbs")
 
 if __name__ == "__main__":
     main()
