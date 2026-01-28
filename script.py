@@ -155,7 +155,7 @@ def update_unit_file():
     print(f"  Таблица C (dimensions): {Path(dimensions_file).name}")
     print(f"  Таблица D (prices): {Path(prices_file).name}")
     print(f"  Таблица F (unit): {Path(unit_file).name}")
-    
+    #a
     try:
         # ============================================
         # 1. Чтение таблицы A (MARK_ozon_report)
