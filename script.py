@@ -85,6 +85,18 @@ def process_analytics_files(analytics_files):
 
     return all_analytics_data
 
+def divide_by_100(value):
+    """Делит значение на 100, если оно является числом"""
+    try:
+        if value is None:
+            return None
+        # Пробуем преобразовать в число
+        num_value = float(value)
+        return num_value / 100
+    except (ValueError, TypeError):
+        # Если не удалось преобразовать, возвращаем оригинальное значение
+        return value
+
 def update_unit_file():
     # Пути к папкам (ОТНОСИТЕЛЬНЫЕ ОТ РАБОЧЕЙ ДИРЕКТОРИИ)
     base_dir = BASE_DIR
@@ -210,17 +222,22 @@ def update_unit_file():
                     width = row[3] if len(row) > 3 else None   # Столбец D (Ширина)
                     height = row[4] if len(row) > 4 else None  # Столбец E (Высота)
                     # НОВОЕ: добавлены столбцы G и H
-                    col_g = row[6] if len(row) > 6 else None   # Столбец G
-                    col_h = row[7] if len(row) > 7 else None   # Столбец H
+                    col_g_raw = row[6] if len(row) > 6 else None   # Столбец G
+                    col_h_raw = row[7] if len(row) > 7 else None   # Столбец H
+                    
+                    # Делим значения из G и H на 100 сразу при чтении
+                    col_g = divide_by_100(col_g_raw)
+                    col_h = divide_by_100(col_h_raw)
+                    
                     dimensions_data[sku] = {
                         'length': length,
                         'width': width,
                         'height': height,
-                        'col_g': col_g,  # НОВОЕ
-                        'col_h': col_h   # НОВОЕ
+                        'col_g': col_g,  # Уже разделено на 100
+                        'col_h': col_h   # Уже разделено на 100
                     }
         print(f"   Найдено {len(dimensions_data)} SKU в таблице C")
-        print(f"   Дополнительно извлечены столбцы G и H")
+        print(f"   Дополнительно извлечены столбцы G и H (значения разделены на 100)")
         
         # ============================================
         # 4. Чтение таблицы D (prices_with_co-investment)
@@ -302,13 +319,13 @@ def update_unit_file():
                     if col_t_value:
                         col_t_str = str(col_t_value).strip().upper()
                         
-                        # Если в столбце T "FBO", заполняем столбец P данными из столбца G таблицы C
+                        # Если в столбце T "FBO", заполняем столбец P данными из столбца G таблицы C (уже разделено на 100)
                         if col_t_str == "FBO" and dim.get('col_g') is not None:
                             ws.cell(row=row, column=16, value=dim['col_g'])  # Столбец P
                             updated = True
                             # print(f"   Строка {row}: Заполнен столбец P (FBO) значением {dim['col_g']}")
                         
-                        # Если в столбце T "FBS", заполняем столбец P данными из столбца H таблицы C
+                        # Если в столбце T "FBS", заполняем столбец P данными из столбца H таблицы C (уже разделено на 100)
                         elif col_t_str == "FBS" and dim.get('col_h') is not None:
                             ws.cell(row=row, column=16, value=dim['col_h'])  # Столбец P
                             updated = True
@@ -347,7 +364,7 @@ def update_unit_file():
         print("=" * 60)
         print(f"Таблица A (MARK): {len(mark_data)} SKU")
         print(f"Таблица B (analytics): {len(analytics_data)} уникальных SKU из {len(analytics_files)} файлов")
-        print(f"Таблица C (dimensions): {len(dimensions_data)} SKU (с извлечением столбцов G и H)")
+        print(f"Таблица C (dimensions): {len(dimensions_data)} SKU (столбцы G и H разделены на 100)")
         print(f"Таблица D (prices): {len(prices_data)} SKU")
         print(f"Таблица F (unit): {total_rows} строк с SKU, {updated_count} обновлено")
         print(f"\nФайлы:")
@@ -371,6 +388,7 @@ if __name__ == "__main__":
     print("Внимание: Обрабатываются 2 последних файла в папке analytics_report")
     print("Новое: Из таблицы C извлекаются столбцы G и H для заполнения столбца P")
     print("Новое: Столбец P заполняется в зависимости от значения в столбце T (FBO/FBS)")
+    print("Новое: Значения из столбцов G и H делятся на 100 перед занесением в столбец P")
     print("=" * 60)
     
     success = update_unit_file()
